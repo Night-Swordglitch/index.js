@@ -20,13 +20,12 @@ app.post("/ai", async (req, res) => {
       return res.status(400).json({ error: "No message provided." });
     }
 
-    // ---- Gemini URL ----
+    // CORRECT GEMINI ENDPOINT
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    // ---- Gemini API Call ----
     const response = await fetch(url, {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -41,8 +40,8 @@ app.post("/ai", async (req, res) => {
     }
 
     const reply = data.candidates[0].content.parts[0].text;
-
     res.json({ reply });
+
   } catch (err) {
     console.error("Server error:", err);
     res.json({ reply: "Error: Unable to contact AI proxy." });
