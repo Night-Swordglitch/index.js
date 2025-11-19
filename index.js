@@ -1,66 +1,49 @@
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
-
-dotenv.config();
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import fetch from 'node-fetch';
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Gemini API endpoint (update if your model/region is different)
-const GEMINI_URL = "https://generativeai.googleapis.com/v1beta2/models/text-bison-001:generateMessage";
+const GEMINI_KEY = process.env.GEMINI_API_KEY; // from Render env variables
+const PORT = process.env.PORT || 10000;
 
-// Health check
-app.get("/", (req, res) => {
-  res.send("Gemini proxy is running");
-});
+// Basic health check
+app.get('/', (req, res) => res.send('Gemini proxy is running'));
 
-// Endpoint to forward user messages to Gemini
-app.post("/chat", async (req, res) => {
+// AI chat endpoint
+app.post('/ai', async (req, res) => {
   const { message } = req.body;
 
-  if (!message) {
-    return res.status(400).json({ error: "No message provided" });
-  }
+  if (!message) return res.json({ reply: "No message provided" });
 
   try {
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
+    const response = await fetch('https://api.generativeai.google/v1/chat', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.GEMINI_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GEMINI_KEY}`
       },
       body: JSON.stringify({
         prompt: message,
+        // optional: you can configure model, temperature, etc.
+        model: 'gemini-1.5',
         temperature: 0.7,
-        maxOutputTokens: 256
-      }),
+        max_output_tokens: 500
+      })
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("Gemini API error:", text);
-      return res.status(response.status).json({ error: "Gemini API error", details: text });
-    }
-
     const data = await response.json();
-
-    // Adjust depending on Gemini's response format
-    const reply = data?.candidates?.[0]?.content || "No response from Gemini";
+    const reply = data?.response || data?.candidates?.[0]?.content || "No reply from Gemini";
 
     res.json({ reply });
+
   } catch (err) {
-    console.error("Error contacting Gemini:", err);
-    res.status(500).json({ error: "Failed to contact Gemini", details: err.message });
+    console.error("Proxy AI error:", err);
+    res.json({ reply: "No reply from Gemini" });
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Gemini proxy running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Gemini proxy running on port ${PORT}`));
