@@ -1,53 +1,54 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
 import dotenv from "dotenv";
-dotenv.config();
+import fetch from "node-fetch";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
+dotenv.config();
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Jarvis Gemini Proxy is running.");
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-app.post("/ai", async (req, res) => {
+// MAIN CHAT ROUTE
+app.post("/chat", async (req, res) => {
   try {
-    const { message } = req.body;
+    const userText = req.body.text;
 
-    if (!message) {
-      return res.status(400).json({ error: "No message provided." });
+    if (!userText) {
+      return res.status(400).json({ error: "No user text provided" });
     }
 
-    // CORRECT GEMINI ENDPOINT
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: message }] }]
-      })
+    // Send to Gemini
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: userText }]
+        }
+      ]
     });
 
-    const data = await response.json();
+    const aiReply = result.response.text();
 
-    if (!data || !data.candidates || !data.candidates[0]) {
-      return res.json({ reply: "Gemini returned no response." });
-    }
+    console.log("AI replied:", aiReply);
 
-    const reply = data.candidates[0].content.parts[0].text;
-    res.json({ reply });
+    res.json({ reply: aiReply });
 
   } catch (err) {
-    console.error("Server error:", err);
-    res.json({ reply: "Error: Unable to contact AI proxy." });
+    console.error("Gemini Error:", err);
+    res.status(500).json({ error: "Gemini returned no response" });
   }
 });
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log("Gemini proxy running on port", process.env.PORT || 3000);
+app.get("/", (req, res) => {
+  res.send("JARVIS AI Proxy is running");
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
 });
