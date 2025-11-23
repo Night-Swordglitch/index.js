@@ -1,7 +1,6 @@
 // index.js
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -10,15 +9,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Your Gemini API Key should be set in Render environment variables
+// Read Gemini API key from environment
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = "https://generativeai.googleapis.com/v1beta2/models/gemini-1.5:generateText";
 
+// AI proxy endpoint
 app.post("/ai", async (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).json({ error: "No message provided" });
 
   try {
+    // Native fetch in Node 18+
     const response = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
@@ -34,15 +35,17 @@ app.post("/ai", async (req, res) => {
 
     const data = await response.json();
 
-    // Adjust according to actual Gemini response structure
+    // Adjust based on actual Gemini API response
     const aiText = data?.candidates?.[0]?.content || "No response from Gemini";
+
     res.json({ reply: aiText });
 
   } catch (err) {
-    console.error(err);
+    console.error("Failed to fetch from Gemini:", err);
     res.status(500).json({ error: "Failed to fetch from Gemini", details: err.message });
   }
 });
 
+// Use PORT from Render or fallback to 10000
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`AI proxy running on port ${PORT}`));
