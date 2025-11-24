@@ -3,6 +3,10 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
+app.get("/", (req, res) => {
+  res.send("AI Proxy Online");
+});
+
 dotenv.config();
 
 const app = express();
@@ -53,3 +57,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`AI proxy running on port ${PORT}`);
 });
+
