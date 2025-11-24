@@ -1,6 +1,9 @@
 import express from "express";
-import "dotenv/config"; // loads .env variables
 import cors from "cors";
+import dotenv from "dotenv";
+import fetch from "node-fetch"; // only needed if Node < 18; Node 18+ has fetch built-in
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -9,61 +12,42 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 app.use(cors());
 app.use(express.json());
 
-// =========================
-// Test root route
-// =========================
-app.get("/", (req, res) => {
-  res.send("AI Proxy Online");
-});
-
-// =========================
-// Chat endpoint
-// =========================
 app.post("/chat", async (req, res) => {
   try {
     const { message } = req.body;
-
     if (!message) return res.json({ reply: "No message received" });
 
-    if (!GEMINI_API_KEY) {
-      return res.json({ reply: "GEMINI_API_KEY not set" });
-    }
+    // Gemini / PaLM v1 endpoint
+    const apiUrl = "https://generativeai.googleapis.com/v1/models/text-bison-001:generateMessage";
 
-    // =========================
-    // Call Gemini API via fetch
-    // =========================
-    const response = await fetch(
-      "https://generativeai.googleapis.com/v1beta2/models/gemini-1.5:generateText",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${GEMINI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          prompt: message,
-          temperature: 0.7,
-          maxOutputTokens: 200
-        }),
-      }
-    );
+    const payload = {
+      messages: [{ author: "user", content: message }],
+      temperature: 0.7,
+      candidateCount: 1
+    };
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GEMINI_API_KEY}`,
+      },
+      body: JSON.stringify(payload),
+    });
 
     const data = await response.json();
+    console.log("Gemini response:", JSON.stringify(data, null, 2));
 
-    // Gemini returns text in data.candidates[0].output
-    const reply = data?.candidates?.[0]?.output?.content || "No response from AI";
-
+    // Extract AI text
+    const reply = data?.candidates?.[0]?.content?.[0]?.text || "No response from AI";
     res.json({ reply });
 
   } catch (err) {
     console.error("Error in /chat:", err);
-    res.json({ reply: "Error contacting AI" });
+    res.json({ reply: "Error contacting AI: " + err.message });
   }
 });
 
-// =========================
-// Start server
-// =========================
 app.listen(PORT, () => {
-  console.log(`AI Proxy running on port ${PORT}`);
+  console.log(`AI proxy running on port ${PORT}`);
 });
