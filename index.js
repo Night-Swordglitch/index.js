@@ -1,60 +1,69 @@
-// index.js
 import express from "express";
+import "dotenv/config"; // loads .env variables
 import cors from "cors";
-import dotenv from "dotenv";
 
+const app = express();
+const PORT = process.env.PORT || 10000;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+app.use(cors());
+app.use(express.json());
+
+// =========================
+// Test root route
+// =========================
 app.get("/", (req, res) => {
   res.send("AI Proxy Online");
 });
 
-dotenv.config();
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-// Gemini API key from environment
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_KEY) {
-  console.error("ERROR: GEMINI_API_KEY not set in environment");
-  process.exit(1);
-}
-
-const GEMINI_URL = "https://generativeai.googleapis.com/v1beta2/models/gemini-1.5:generateText";
-
-// AI proxy endpoint
-app.post("/ai", async (req, res) => {
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ error: "No message provided" });
-
+// =========================
+// Chat endpoint
+// =========================
+app.post("/chat", async (req, res) => {
   try {
-    // Node 20+ native fetch
-    const response = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${GEMINI_KEY}`,
-      },
-      body: JSON.stringify({
-        prompt: message,
-        temperature: 0.7,
-        maxOutputTokens: 512
-      }),
-    });
+    const { message } = req.body;
+
+    if (!message) return res.json({ reply: "No message received" });
+
+    if (!GEMINI_API_KEY) {
+      return res.json({ reply: "GEMINI_API_KEY not set" });
+    }
+
+    // =========================
+    // Call Gemini API via fetch
+    // =========================
+    const response = await fetch(
+      "https://generativeai.googleapis.com/v1beta2/models/gemini-1.5:generateText",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${GEMINI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt: message,
+          temperature: 0.7,
+          maxOutputTokens: 200
+        }),
+      }
+    );
 
     const data = await response.json();
-    const aiText = data?.candidates?.[0]?.content || "No response from Gemini";
 
-    res.json({ reply: aiText });
+    // Gemini returns text in data.candidates[0].output
+    const reply = data?.candidates?.[0]?.output?.content || "No response from AI";
+
+    res.json({ reply });
+
   } catch (err) {
-    console.error("Failed to fetch from Gemini:", err);
-    res.status(500).json({ error: "Failed to fetch from Gemini", details: err.message });
+    console.error("Error in /chat:", err);
+    res.json({ reply: "Error contacting AI" });
   }
 });
 
-// Port from Render or fallback to 10000 for local testing
-const PORT = process.env.PORT || 10000;
+// =========================
+// Start server
+// =========================
 app.listen(PORT, () => {
-  console.log(`AI proxy running on port ${PORT}`);
+  console.log(`AI Proxy running on port ${PORT}`);
 });
-
